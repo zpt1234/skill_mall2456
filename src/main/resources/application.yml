@@ -1,0 +1,121 @@
+# ========================
+# 服务器配置
+# ========================
+server:
+  port: 8080
+
+spring:
+  profiles:
+    active: dev
+  main:
+    allow-circular-references: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  application:
+    name: seckill-mall1
+  # ========================
+  # 数据源配置
+  # ========================
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/seckill_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&allowMultiQueries=true&connectTimeout=5000&socketTimeout=10000&autoReconnect=true&failOverReadOnly=false
+    username: ${spring.datasource.username}
+    password: ${spring.datasource.password}  # 请根据实际情况修改MySQL密码
+    # HikariCP 连接池配置
+    hikari:
+      # 最小空闲连接数
+      minimum-idle: 5
+      # 最大连接池大小
+      maximum-pool-size: 20
+      # 连接超时时间（毫秒）
+      connection-timeout: 30000
+      # 空闲连接最大存活时间（毫秒）
+      idle-timeout: 600000
+      # 连接最大生命周期（毫秒）
+      max-lifetime: 1800000
+      # 连接测试查询
+      connection-test-query: SELECT 1
+      # 自动提交
+      auto-commit: true
+  alioss:
+    endpoint: ${spring.alioss.endpoint}
+    access-key-id: ${spring.alioss.access-key-id}
+    access-key-secret: ${spring.alioss.access-key-secret}
+    bucket-name: ${spring.alioss.bucket-name}
+  # ========================
+  # Redis配置
+  # ========================
+  redis:
+    host: ${spring.redis.host}
+    port: ${spring.redis.port}
+    database: 0
+    timeout: 3000ms
+    password: ${spring.redis.password}
+  # ========================
+  # RabbitMQ配置
+  # ========================
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        acknowledge-mode: manual
+        prefetch: 1
+  # ========================
+  # Spring Cloud配置
+  # ========================
+  cloud:
+    # Nacos服务发现配置
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+    # Sentinel流量控制配置
+    sentinel:
+      transport:
+        dashboard: localhost:8858
+        port: 8719
+
+# ========================
+# MyBatis-Plus配置
+# ========================
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.seckill.user.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+# ========================
+# Redisson分布式锁配置
+# ========================
+redisson:
+  config: |
+    singleServerConfig:
+      address: "redis://localhost:6379"
+      password: 
+      database: 0
+      connectionPoolSize: 64
+      connectionMinimumIdleSize: 24
+      timeout: 3000
+      connectTimeout: 10000
+# ========================
+#        AI调用配置
+# ========================
+ai:
+  api:
+    key: ${spring.ai.api.key}
+    url: https://api.deepseek.com/chat/completions
+  model: deepseek-v4-flash
+
+# ========================
+# 日志配置
+# ========================
+logging:
+  level:
+    # MyBatis SQL 日志级别（ERROR 只输出错误，DEBUG 输出所有 SQL）
+    com.seckill.mapper: ERROR
+    # 或者针对特定包设置
+    com.baomidou.mybatisplus: WARN
