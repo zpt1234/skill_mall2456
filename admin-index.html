@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理控制台</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .sidebar { height: 100vh; background: #343a40; padding: 20px; }
+        .sidebar a { color: white; display: block; padding: 10px; text-decoration: none; }
+        .sidebar a:hover { background: #495057; }
+        .sidebar a.active { background: #0d6efd; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="d-flex">
+        <!-- 侧边栏导航 -->
+        <div class="sidebar text-white">
+            <h5>秒杀管理后台</h5>
+            <hr>
+            <a href="admin-index.html" class="active">控制台</a>
+            <a href="admin-goods.html">秒杀商品管理</a>
+            <a href="admin-order.html">订单管理</a>
+            <hr>
+            <a href="javascript:logout()" class="text-danger">退出登录</a>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="flex-grow-1 p-4">
+            <h3>欢迎，<span id="adminName">管理员</span>！</h3>
+            <hr>
+            <div class="alert alert-info">
+                欢迎使用秒杀商品管理系统<br>
+                左侧菜单可管理商品、查看订单
+            </div>
+            <!-- 可选：显示系统统计数据 -->
+            <div class="row mt-4">
+                <div class="col-md-4">
+                    <div class="card bg-primary text-white p-3">
+                        <h5>商品总数</h5>
+                        <p id="goodsCount" class="fs-3">0</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-success text-white p-3">
+                        <h5>今日订单</h5>
+                        <p id="todayOrderCount" class="fs-3">0</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-warning text-white p-3">
+                        <h5>总订单数</h5>
+                        <p id="totalOrderCount" class="fs-3">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script src="SeckillUtil.js"></script>
+<script>
+    // 登录校验
+    if (!SeckillUtil.checkLogin()) return;
+
+    // 显示管理员名称（容错处理）
+    const adminName = localStorage.getItem("admin_name") || "管理员";
+    document.getElementById("adminName").innerText = adminName;
+
+    // 加载控制台统计数据（可选，根据后端接口调整）
+    async function loadDashboardData() {
+        try {
+            // 商品总数
+            const goodsRes = await SeckillUtil.request("/goods/admin/list", "GET");
+            document.getElementById("goodsCount").innerText = goodsRes.data.length;
+            
+            // 订单统计（示例接口，需后端配合）
+            const orderRes = await SeckillUtil.request("/order/admin/statistics", "GET");
+            document.getElementById("todayOrderCount").innerText = orderRes.data.todayCount;
+            document.getElementById("totalOrderCount").innerText = orderRes.data.totalCount;
+        } catch (err) {
+            // 统计数据加载失败不影响主功能
+            console.error("加载统计数据失败：", err);
+        }
+    }
+
+    // 退出登录
+    function logout() {
+        if(confirm("确定退出？")){
+            SeckillUtil.logout();
+        }
+    }
+
+    // 页面加载时获取统计数据
+    window.onload = loadDashboardData;
+</script>
+</body>
+</html>

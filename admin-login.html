@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员登录</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header bg-primary text-white text-center">
+                        <h4>秒杀系统 - 管理员登录</h4>
+                    </div>
+                    <div class="card-body">
+                        <form id="loginForm">
+                            <div class="mb-3">
+                                <label class="form-label">账号</label>
+                                <input type="text" id="username" class="form-control" placeholder="请输入账号" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">密码</label>
+                                <input type="password" id="password" class="form-control" placeholder="请输入密码" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">登录</button>
+                            <div class="text-center mt-3">
+                                <a href="admin-register.html">没有账号？去注册</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<!-- 引入工具类 -->
+<script src="SeckillUtil.js"></script>
+<script>
+// 登录表单提交
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    // 获取表单值
+    const params = {
+        username: document.getElementById('username').value.trim(),
+        password: document.getElementById('password').value.trim()
+    };
+
+    // 简单前端校验
+    if (!params.username) return alert("请输入账号！");
+    if (!params.password) return alert("请输入密码！");
+
+    try {
+        // 调用工具类请求后端登录接口
+        const res = await SeckillUtil.request("/admin/login", "POST", params);
+        // 存储token和用户名
+        localStorage.setItem('admin_token', res.data.token);
+        localStorage.setItem('admin_name', params.username);
+        alert('管理员登录成功！');
+        window.location.href = 'admin-index.html';
+    } catch (err) {
+        // 错误已由工具类处理，无需重复提示
+    }
+});
+</script>
+</body>
+</html>

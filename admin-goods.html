@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商品管理</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .sidebar { height: 100vh; background: #343a40; padding: 20px; }
+        .sidebar a { color: white; display: block; padding: 10px; text-decoration: none; }
+        .sidebar a:hover { background: #495057; }
+        .sidebar a.active { background: #0d6efd; border-radius: 4px; }
+        .img-preview { max-width: 100%; max-height: 180px; border: 1px dashed #ccc; border-radius: 4px; padding: 4px; display: none; }
+        .img-preview[src] { display: block; }
+
+        /* 状态标签样式 */
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            display: inline-block;
+            min-width: 60px;
+            text-align: center;
+        }
+        .status-upcoming { background: #e2e3e5; color: #383d41; }
+        .status-preheat { background: #fff3cd; color: #856404; }
+        .status-active { background: #d1ecf1; color: #0c5460; }
+        .status-ended { background: #f8d7da; color: #721c24; }
+
+        .countdown-timer {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #dc3545;
+            font-size: 0.85em;
+            margin-top: 4px;
+        }
+        .countdown-timer.active {
+            color: #0c5460;
+        }
+    </style>
+<base target="_blank">
+<base target="_blank">
+</head>
+<body>
+    <div class="d-flex">
+        <div class="sidebar text-white">
+            <h5>秒杀管理后台</h5>
+            <hr>
+            <a href="admin-index.html">控制台</a>
+            <a href="admin-goods.html" class="active">秒杀商品管理</a>
+            <a href="admin-order.html">订单管理</a>
+            <hr>
+            <a href="javascript:logout()" class="text-danger">退出登录</a>
+        </div>
+
+        <div class="flex-grow-1 p-4">
+            <h3>秒杀商品管理</h3>
+            <hr>
+            <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addModal">新增商品</button>
+            <table class="table table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>商品名称</th>
+                        <th>原价</th>
+                        <th>秒杀价</th>
+                        <th>库存</th>
+                        <th>限购</th>
+                        <th>活动时间</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="goodsTable">
+                    <tr><td colspan="9" class="text-center text-muted">加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 新增弹窗 -->
+    <div class="modal fade" id="addModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新增秒杀商品</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addForm">
+                        <div class="mb-3">
+                            <label for="goodsName">商品名称</label>
+                            <input type="text" id="goodsName" class="form-control" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="goodsPrice">商品原价</label>
+                                <input type="number" id="goodsPrice" class="form-control" min="0.01" step="0.01" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="seckillPrice">秒杀价格</label>
+                                <input type="number" id="seckillPrice" class="form-control" min="0.01" step="0.01" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="stockCount">秒杀库存</label>
+                                <input type="number" id="stockCount" class="form-control" min="1" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="limitNum">单人限购数量</label>
+                                <input type="number" id="limitNum" class="form-control" min="1" value="1" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="goodsImgFile">商品图片</label>
+                            <input type="file" id="goodsImgFile" class="form-control" accept="image/*" onchange="uploadImage('add')">
+                            <input type="hidden" id="goodsImgUrl">
+                            <div class="mt-2">
+                                <img id="goodsImgPreview" class="img-preview" alt="图片预览">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="goodsDetail">商品详情</label>
+                            <textarea id="goodsDetail" class="form-control" rows="3" placeholder="可为空"></textarea>
+                        </div>
+
+                        <!-- 时间配置 -->
+                        <div class="card mb-3 border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <strong>⏰ 秒杀时间配置</strong>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="preheatTime" class="form-label text-danger fw-bold">
+                                        预热开始时间 <small class="text-muted fw-normal">（倒计时从此刻开始）</small>
+                                    </label>
+                                    <input type="datetime-local" id="preheatTime" class="form-control" required>
+                                    <div class="form-text">预热阶段展示商品，显示倒计时，不可秒杀</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="startTime" class="form-label text-success fw-bold">
+                                        秒杀开始时间 <small class="text-muted fw-normal">（倒计时结束，开放秒杀）</small>
+                                    </label>
+                                    <input type="datetime-local" id="startTime" class="form-control" required>
+                                    <div class="form-text">到达此时间后，用户才能点击秒杀按钮</div>
+                                </div>
+                                <div class="mb-0">
+                                    <label for="endTime" class="form-label">秒杀结束时间</label>
+                                    <input type="datetime-local" id="endTime" class="form-control" required>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="addGoods()">提交</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 修改弹窗 -->
+    <div class="modal fade" id="editModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">修改商品</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editForm">
+                        <input type="hidden" id="editId">
+                        <div class="mb-3">
+                            <label for="editGoodsName" class="form-label">商品名称</label>
+                            <input type="text" id="editGoodsName" class="form-control" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="editGoodsPrice" class="form-label">原价</label>
+                                <input type="number" id="editGoodsPrice" class="form-control" min="0.01" step="0.01" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editSeckillPrice" class="form-label">秒杀价</label>
+                                <input type="number" id="editSeckillPrice" class="form-control" min="0.01" step="0.01" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="editStockCount" class="form-label">库存</label>
+                                <input type="number" id="editStockCount" class="form-control" min="1" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editLimitNum" class="form-label">单人限购数量</label>
+                                <input type="number" id="editLimitNum" class="form-control" min="1" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editGoodsImgFile" class="form-label">商品图片</label>
+                            <input type="file" id="editGoodsImgFile" class="form-control" accept="image/*" onchange="uploadImage('edit')">
+                            <input type="hidden" id="editGoodsImgUrl">
+                            <div class="mt-2">
+                                <img id="editGoodsImgPreview" class="img-preview" alt="图片预览">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editGoodsDetail" class="form-label">商品详情</label>
+                            <textarea id="editGoodsDetail" class="form-control" rows="3" placeholder="可为空"></textarea>
+                        </div>
+
+                        <!-- 时间配置 -->
+                        <div class="card mb-3 border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <strong>⏰ 秒杀时间配置</strong>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="editPreheatTime" class="form-label text-danger fw-bold">预热开始时间</label>
+                                    <input type="datetime-local" id="editPreheatTime" class="form-control" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="editStartTime" class="form-label text-success fw-bold">秒杀开始时间</label>
+                                    <input type="datetime-local" id="editStartTime" class="form-control" required>
+                                </div>
+                                <div class="mb-0">
+                                    <label for="editEndTime" class="form-label">秒杀结束时间</label>
+                                    <input type="datetime-local" id="editEndTime" class="form-control" required>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="updateGoods()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script src="SeckillUtil.js"></script>
+<script>
+// 全局倒计时定时器
+const countdownTimers = {};
+
+window.onload = function() {
+    if (!SeckillUtil.checkLogin()) {
+        window.location.href = "admin-login.html";
+        return;
+    }
+    loadSeckillGoodsList();
+};
+
+async function loadSeckillGoodsList() {
+    try {
+        const res = await SeckillUtil.request("/goods/admin/seckill/list", "GET");
+        renderTable(res.data);
+    } catch (err) {
+        if (err.message && err.message.includes("暂无")) {
+            renderTable([]);
+        } else {
+            renderError(err.message || "网络异常");
+        }
+    }
+}
+
+// 获取商品当前状态
+function getGoodsStatus(item) {
+    const now = new Date().getTime();
+    const preheatTime = item.preheatTime ? new Date(item.preheatTime.replace(' ', 'T')).getTime() : 0;
+    const startTime = item.startTime ? new Date(item.startTime.replace(' ', 'T')).getTime() : 0;
+    const endTime = item.endTime ? new Date(item.endTime.replace(' ', 'T')).getTime() : 0;
+
+    if (now < preheatTime) {
+        return { code: 'upcoming', text: '未开始', class: 'status-upcoming', countdownTarget: null };
+    } else if (now >= preheatTime && now < startTime) {
+        return { code: 'preheat', text: '预热中', class: 'status-preheat', countdownTarget: startTime };
+    } else if (now >= startTime && now < endTime) {
+        return { code: 'active', text: '秒杀中', class: 'status-active', countdownTarget: endTime };
+    } else {
+        return { code: 'ended', text: '已结束', class: 'status-ended', countdownTarget: null };
+    }
+}
+
+// 格式化倒计时
+function formatCountdown(ms) {
+    if (ms <= 0) return "00:00:00";
+    const seconds = Math.floor((ms / 1000) % 60);
+    const minutes = Math.floor((ms / (1000 * 60)) % 60);
+    const hours = Math.floor((ms / (1000 * 60 * 60)) % 24);
+    const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+    const pad = (n) => n.toString().padStart(2, '0');
+    if (days > 0) return `${days}天 ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+function renderTable(list) {
+    // 清除旧定时器
+    Object.values(countdownTimers).forEach(timer => clearInterval(timer));
+    for (let k in countdownTimers) delete countdownTimers[k];
+
+    let html = "";
+    if (!list || list.length === 0) {
+        html = '<tr><td colspan="9" class="text-center text-muted">暂无商品，点击上方"新增商品"按钮添加</td></tr>';
+    } else {
+        list.forEach((item, index) => {
+            const realId = item.id || "-";
+            const displayId = index + 1;
+            const status = getGoodsStatus(item);
+            const countdownId = `countdown-${realId}`;
+
+            let countdownHtml = '';
+            if (status.code === 'preheat') {
+                countdownHtml = `<div class="countdown-timer" id="${countdownId}">计算中...</div>`;
+            } else if (status.code === 'active') {
+                countdownHtml = `<div class="countdown-timer active" id="${countdownId}">计算中...</div>`;
+            }
+
+            html += `
+            <tr>
+                <td>${displayId}</td>
+                <td>${item.seckillGoodsName || "未知商品"}</td>
+                <td>¥${item.originPrice?.toFixed(2) || "0.00"}</td>
+                <td>¥${item.seckillPrice?.toFixed(2) || "0.00"}</td>
+                <td>${item.stockCount || 0}</td>
+                <td>${item.limitNum != null ? item.limitNum + '件' : '-'}</td>
+                <td>
+                    <small class="text-muted">
+                        预热: ${formatDisplayTime(item.preheatTime)}<br>
+                        开始: ${formatDisplayTime(item.startTime)}<br>
+                        结束: ${formatDisplayTime(item.endTime)}
+                    </small>
+                </td>
+                <td>
+                    <span class="status-badge ${status.class}">${status.text}</span>
+                    ${countdownHtml}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-secondary me-1" onclick="openEditModal(${realId})">修改</button>
+                    <button class="btn btn-sm btn-dark" onclick="deleteGoods(${realId})">删除</button>
+                </td>
+            </tr>`;
+        });
+    }
+    document.getElementById("goodsTable").innerHTML = html;
+
+    // 启动倒计时
+    list?.forEach(item => {
+        const status = getGoodsStatus(item);
+        if (status.countdownTarget) {
+            startCountdown(item.id, status.countdownTarget, status.code);
+        }
+    });
+}
+
+function startCountdown(goodsId, targetTime, statusCode) {
+    const elementId = `countdown-${goodsId}`;
+    const label = statusCode === 'preheat' ? '距开始: ' : '距结束: ';
+
+    function update() {
+        const el = document.getElementById(elementId);
+        if (!el) {
+            if (countdownTimers[goodsId]) clearInterval(countdownTimers[goodsId]);
+            delete countdownTimers[goodsId];
+            return;
+        }
+        const remaining = targetTime - new Date().getTime();
+        if (remaining <= 0) {
+            el.innerHTML = statusCode === 'preheat' ? '秒杀已开始！' : '活动已结束！';
+            if (countdownTimers[goodsId]) clearInterval(countdownTimers[goodsId]);
+            delete countdownTimers[goodsId];
+            setTimeout(() => loadSeckillGoodsList(), 2000);
+            return;
+        }
+        el.innerHTML = label + formatCountdown(remaining);
+    }
+
+    update();
+    countdownTimers[goodsId] = setInterval(update, 1000);
+}
+
+function renderError(msg) {
+    document.getElementById("goodsTable").innerHTML =
+        `<tr><td colspan="9" class="text-center text-danger">加载失败：${msg}</td></tr>`;
+}
+
+function formatDisplayTime(str) {
+    if (!str) return "";
+    return str.replace("T", " ").substring(0, 16);
+}
+
+function formatTimeForBackend(inputVal) {
+    if (!inputVal) return "";
+    return inputVal.replace("T", " ");
+}
+
+// ========== 图片上传 + 预览 ==========
+window.uploadImage = async function(type) {
+    const fileInputId = type === 'add' ? 'goodsImgFile' : 'editGoodsImgFile';
+    const hiddenInputId = type === 'add' ? 'goodsImgUrl' : 'editGoodsImgUrl';
+    const previewId = type === 'add' ? 'goodsImgPreview' : 'editGoodsImgPreview';
+
+    const fileInput = document.getElementById(fileInputId);
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+        alert('请选择图片文件');
+        fileInput.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        document.getElementById(previewId).src = e.target.result;
+        document.getElementById(previewId).style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const token = localStorage.getItem("admin_token") || "";
+        const resp = await fetch(SeckillUtil.baseURL + '/admin/common/upload', {
+            method: 'POST',
+            headers: { 'Authorization': token },
+            body: formData
+        });
+        const data = await resp.json();
+        if (data.code !== 200) {
+            throw new Error(data.msg || '上传失败');
+        }
+        const url = data.data;
+        document.getElementById(hiddenInputId).value = url;
+        document.getElementById(previewId).src = url;
+    } catch (err) {
+        alert('图片上传失败：' + (err.message || '网络错误'));
+        fileInput.value = '';
+        document.getElementById(previewId).style.display = 'none';
+        document.getElementById(hiddenInputId).value = '';
+    }
+};
+
+// 新增商品
+window.addGoods = async function() {
+    const preheatVal = document.getElementById("preheatTime").value;
+    const startVal = document.getElementById("startTime").value;
+    const endVal = document.getElementById("endTime").value;
+
+    const params = {
+        seckillGoodsName: document.getElementById("goodsName").value.trim(),
+        originPrice: Number(document.getElementById("goodsPrice").value),
+        seckillPrice: Number(document.getElementById("seckillPrice").value),
+        stockCount: Number(document.getElementById("stockCount").value),
+        limitNum: Number(document.getElementById("limitNum").value),
+        preheatTime: formatTimeForBackend(preheatVal),
+        startTime: formatTimeForBackend(startVal),
+        endTime: formatTimeForBackend(endVal)
+    };
+
+    const img = document.getElementById("goodsImgUrl").value.trim();
+    const desc = document.getElementById("goodsDetail").value.trim();
+    if (img) params.images = img;
+    if (desc) params.goodsDesc = desc;
+
+    if (!params.seckillGoodsName) { alert("商品名称不能为空"); return; }
+    if (params.originPrice < 0) { alert("原价不能小于0"); return; }
+    if (params.seckillPrice < 0) { alert("秒杀价不能小于0"); return; }
+    if (params.stockCount < 0) { alert("库存不能小于0"); return; }
+    if (params.limitNum < 1) { alert("限购数量不能小于1"); return; }
+    if (!preheatVal || !startVal || !endVal) { alert("时间不能为空"); return; }
+
+    // 时间顺序校验
+    const preheatDate = new Date(preheatVal);
+    const startDate = new Date(startVal);
+    const endDate = new Date(endVal);
+
+    if (preheatDate >= startDate) { alert("预热开始时间必须早于秒杀开始时间！"); return; }
+    if (startDate >= endDate) { alert("秒杀开始时间必须早于结束时间！"); return; }
+
+    try {
+        await SeckillUtil.request("/goods/admin/seckill/add", "POST", params);
+        alert("新增成功！");
+        bootstrap.Modal.getInstance(document.getElementById("addModal")).hide();
+        document.getElementById("addForm").reset();
+        document.getElementById("goodsImgPreview").style.display = 'none';
+        document.getElementById("goodsImgPreview").src = '';
+        document.getElementById("goodsImgUrl").value = '';
+        loadSeckillGoodsList();
+    } catch (err) {
+        console.error("新增失败详情：", err);
+    }
+};
+
+// 打开修改弹窗
+window.openEditModal = async function(id) {
+    const res = await SeckillUtil.request(`/goods/admin/seckill/${id}`, "GET");
+    const g = res.data;
+    document.getElementById("editId").value = g.id;
+    document.getElementById("editGoodsName").value = g.seckillGoodsName || "";
+    document.getElementById("editGoodsPrice").value = g.originPrice || "";
+    document.getElementById("editSeckillPrice").value = g.seckillPrice || "";
+    document.getElementById("editStockCount").value = g.stockCount || "";
+    document.getElementById("editLimitNum").value = g.limitNum != null ? g.limitNum : 1;
+    document.getElementById("editGoodsDetail").value = g.goodsDesc || "";
+
+    // 回显三个时间字段
+    document.getElementById("editPreheatTime").value = g.preheatTime ? g.preheatTime.substring(0, 16).replace(" ", "T") : "";
+    document.getElementById("editStartTime").value = g.startTime ? g.startTime.substring(0, 16).replace(" ", "T") : "";
+    document.getElementById("editEndTime").value = g.endTime ? g.endTime.substring(0, 16).replace(" ", "T") : "";
+
+    const imgUrl = g.images || "";
+    document.getElementById("editGoodsImgUrl").value = imgUrl;
+    const preview = document.getElementById("editGoodsImgPreview");
+    if (imgUrl) {
+        preview.src = imgUrl;
+        preview.style.display = 'block';
+    } else {
+        preview.src = '';
+        preview.style.display = 'none';
+    }
+    document.getElementById("editGoodsImgFile").value = '';
+
+    new bootstrap.Modal(document.getElementById("editModal")).show();
+};
+
+// 保存修改
+window.updateGoods = async function() {
+    const id = document.getElementById("editId").value;
+    const preheatVal = document.getElementById("editPreheatTime").value;
+    const startVal = document.getElementById("editStartTime").value;
+    const endVal = document.getElementById("editEndTime").value;
+
+    const params = {
+        seckillGoodsName: document.getElementById("editGoodsName").value.trim(),
+        originPrice: Number(document.getElementById("editGoodsPrice").value),
+        seckillPrice: Number(document.getElementById("editSeckillPrice").value),
+        stockCount: Number(document.getElementById("editStockCount").value),
+        limitNum: Number(document.getElementById("editLimitNum").value),
+        preheatTime: formatTimeForBackend(preheatVal),
+        startTime: formatTimeForBackend(startVal),
+        endTime: formatTimeForBackend(endVal)
+    };
+
+    const img = document.getElementById("editGoodsImgUrl").value.trim();
+    const desc = document.getElementById("editGoodsDetail").value.trim();
+    if (img) params.images = img;
+    if (desc) params.goodsDesc = desc;
+
+    if (!params.seckillGoodsName) { alert("商品名称不能为空"); return; }
+    if (params.originPrice < 0) { alert("原价不能小于0"); return; }
+    if (params.seckillPrice < 0) { alert("秒杀价不能小于0"); return; }
+    if (params.stockCount < 0) { alert("库存不能小于0"); return; }
+    if (params.limitNum < 1) { alert("限购数量不能小于1"); return; }
+    if (!preheatVal || !startVal || !endVal) { alert("时间不能为空"); return; }
+
+    const preheatDate = new Date(preheatVal);
+    const startDate = new Date(startVal);
+    const endDate = new Date(endVal);
+
+    if (preheatDate >= startDate) { alert("预热开始时间必须早于秒杀开始时间！"); return; }
+    if (startDate >= endDate) { alert("秒杀开始时间必须早于结束时间！"); return; }
+
+    try {
+        await SeckillUtil.request(`/goods/admin/seckill/update/${id}`, "PUT", params);
+        alert("修改成功！");
+        bootstrap.Modal.getInstance(document.getElementById("editModal")).hide();
+        loadSeckillGoodsList();
+    } catch (err) {
+        console.error("修改失败详情：", err);
+    }
+};
+
+// 删除商品
+window.deleteGoods = async function(id) {
+    if(!confirm("确定删除？")) return;
+    try {
+        await SeckillUtil.request(`/goods/admin/seckill/delete/${id}`, "DELETE");
+        alert("删除成功！");
+        loadSeckillGoodsList();
+    } catch (err) {
+        console.error("删除失败详情：", err);
+    }
+};
+
+// 退出登录
+window.logout = function() {
+    if(confirm("确定退出？")) SeckillUtil.logout();
+};
+</script>
+</body>
+</html>

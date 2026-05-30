@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订单管理</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .sidebar { height: 100vh; background: #343a40; padding: 20px; position: sticky; top: 0; }
+        .sidebar a { color: white; display: block; padding: 10px; text-decoration: none; }
+        .sidebar a:hover { background: #495057; }
+        .sidebar a.active { background: #0d6efd; border-radius: 4px; }
+        .order-status-0 { color: #ffc107; font-weight: bold; }
+        .order-status-1 { color: #198754; font-weight: bold; }
+        .order-status-2 { color: #dc3545; font-weight: bold; }
+        .order-status-3 { color: #0d6efd; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="d-flex">
+        <!-- 统一侧边栏 -->
+        <div class="sidebar text-white">
+            <h5>秒杀管理后台</h5>
+            <hr>
+            <a href="admin-index.html">控制台</a>
+            <a href="admin-goods.html">秒杀商品管理</a>
+            <a href="admin-order.html" class="active">订单管理</a>
+            <hr>
+            <a href="javascript:logout()" class="text-danger">退出登录</a>
+        </div>
+
+        <!-- 订单管理内容 -->
+        <div class="flex-grow-1 p-4">
+            <h3>秒杀订单管理</h3>
+            <hr>
+            <!-- 订单筛选 -->
+            <div class="mb-3 row align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">订单ID</label>
+                    <input type="text" id="orderIdSearch" class="form-control" placeholder="输入订单ID查询">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">用户ID</label>
+                    <input type="text" id="userIdSearch" class="form-control" placeholder="输入用户ID查询">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">订单状态</label>
+                    <select id="statusSearch" class="form-select">
+                        <option value="">全部状态</option>
+                        <option value="0">未支付</option>
+                        <option value="1">已支付</option>
+                        <option value="2">已取消</option>
+                        <option value="3">已完成</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-primary w-100" onclick="loadOrderList(1)">查询</button>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-outline-secondary w-100" onclick="resetSearch()">重置</button>
+                </div>
+            </div>
+
+            <!-- 订单表格 -->
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>订单ID</th>
+                            <th>用户ID</th>
+                            <th>商品名称</th>
+                            <th>秒杀价格</th>
+                            <th>下单时间</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orderTable">
+                        <tr><td colspan="7" class="text-center">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页控件 -->
+            <nav>
+                <ul id="pagination" class="pagination justify-content-center">
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+    <!-- 订单详情模态框 -->
+    <div class="modal fade" id="orderDetailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">订单详情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="orderDetailContent">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script src="SeckillUtil.js"></script>
+<script>
+    // 登录校验，未登录直接跳转到登录页，代码终止执行
+    if (!SeckillUtil.checkLogin()) {
+        window.location.href = 'admin-login.html';
+    }
+
+    // 分页参数
+    let pageNum = 1;
+    let pageSize = 10;
+    let total = 0;
+
+    // 页面加载
+    window.onload = () => loadOrderList(1);
+
+    // 加载订单列表
+    async function loadOrderList(page = 1) {
+        pageNum = page;
+        const params = {
+            orderId: document.getElementById("orderIdSearch").value.trim() || "",
+            userId: document.getElementById("userIdSearch").value.trim() || "",
+            orderStatus: document.getElementById("statusSearch").value || "",
+            pageNum: pageNum,
+            pageSize: pageSize
+        };
+
+        const tableBody = document.getElementById("orderTable");
+        tableBody.innerHTML = '<tr><td colspan="7" class="text-center">加载中...</td></tr>';
+
+        try {
+            const res = await SeckillUtil.request("/order/admin/page", "GET", params);
+            if (res.code === 200) {
+                total = res.data.total;
+                // ===================== 关键改动：list → records =====================
+                renderOrderTable(res.data.records);
+                renderPagination();
+            } else {
+                tableBody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">${res.msg || '查询失败'}</td></tr>`;
+            }
+        } catch (err) {
+            tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">网络异常，请刷新重试</td></tr>';
+        }
+    }
+
+    // 渲染表格
+    function renderOrderTable(list) {
+        let html = "";
+        const tableBody = document.getElementById("orderTable");
+        if (!list || list.length === 0) {
+            html = '<tr><td colspan="7" class="text-center">暂无订单数据</td></tr>';
+            tableBody.innerHTML = html;
+            return;
+        }
+
+        const statusMap = {0:"未支付",1:"已支付",2:"已取消",3:"已完成"};
+        list.forEach(item => {
+            html += `
+            <tr>
+                <td>${item.id}</td>
+                <td>${item.userId}</td>
+                <td>${item.goodsName}</td>
+                <td>¥${item.orderPrice.toFixed(2)}</td>
+                <td>${formatTime(item.createTime)}</td>
+                <td class="order-status-${item.orderStatus}">${statusMap[item.orderStatus] || '未知状态'}</td>
+                <td>
+                    <button class="btn btn-sm btn-info me-1" onclick="viewOrderDetail(${item.id})">详情</button>
+                    ${item.orderStatus === 0 ? `<button class="btn btn-sm btn-danger me-1" onclick="cancelOrder(${item.id})">取消</button>` : ''}
+                    ${item.orderStatus === 1 ? `<button class="btn btn-sm btn-success" onclick="updateOrderStatus(${item.id},3)">标记完成</button>` : ''}
+                </td>
+            </tr>`;
+        });
+        tableBody.innerHTML = html;
+    }
+
+    // 渲染分页
+    function renderPagination() {
+        const pagination = document.getElementById("pagination");
+        const totalPage = Math.ceil(total / pageSize);
+        let html = "";
+
+        html += `<li class="page-item ${pageNum === 1 ? 'disabled' : ''}">
+                    <a class="page-link" onclick="loadOrderList(${pageNum - 1})">上一页</a>
+                </li>`;
+        for (let i = 1; i <= totalPage; i++) {
+            html += `<li class="page-item ${i === pageNum ? 'active' : ''}">
+                        <a class="page-link" onclick="loadOrderList(${i})">${i}</a>
+                    </li>`;
+        }
+        html += `<li class="page-item ${pageNum === totalPage ? 'disabled' : ''}">
+                    <a class="page-link" onclick="loadOrderList(${pageNum + 1})">下一页</a>
+                </li>`;
+        pagination.innerHTML = html;
+    }
+
+    // 查看详情
+    async function viewOrderDetail(orderId) {
+        const detailContent = document.getElementById("orderDetailContent");
+        detailContent.innerHTML = '<div class="text-center">加载详情中...</div>';
+        try {
+            const res = await SeckillUtil.request(`/order/admin/detail/${orderId}`, "GET");
+            if (res.code === 200) {
+                const d = res.data;
+                detailContent.innerHTML = `
+                <div class="row">
+                    <div class="col-6"><p><strong>订单ID：</strong>${d.id}</p></div>
+                    <div class="col-6"><p><strong>订单号：</strong>${d.orderNo}</p></div>
+                    <div class="col-6"><p><strong>用户ID：</strong>${d.userId}</p></div>
+                    <div class="col-6"><p><strong>商品名称：</strong>${d.goodsName}</p></div>
+                    <div class="col-6"><p><strong>订单价格：</strong>¥${d.orderPrice.toFixed(2)}</p></div>
+                    <div class="col-6"><p><strong>状态：</strong><span class="order-status-${d.orderStatus}">${getStatusText(d.orderStatus)}</span></p></div>
+                    <div class="col-12"><p><strong>创建时间：</strong>${formatTime(d.createTime)}</p></div>
+                    ${d.payTime ? `<div class="col-12"><p><strong>支付时间：</strong>${formatTime(d.payTime)}</p></div>` : ''}
+                </div>`;
+                new bootstrap.Modal('#orderDetailModal').show();
+            }
+        } catch (err) {}
+    }
+
+    // 取消订单
+    async function cancelOrder(orderId) {
+        if (!confirm("确定取消该订单？")) return;
+        try {
+            const res = await SeckillUtil.request(`/order/admin/cancel/${orderId}`, "POST");
+            if (res.code === 200) {
+                alert("取消成功！");
+                loadOrderList(pageNum);
+            } else alert(res.msg || "取消失败");
+        } catch (err) {}
+    }
+
+    // 修改状态
+    async function updateOrderStatus(orderId, status) {
+        if (!confirm("确定修改状态？")) return;
+        try {
+            const res = await SeckillUtil.request("/order/admin/updateStatus", "POST", {orderId,status});
+            if (res.code === 200) {
+                alert("修改成功！");
+                loadOrderList(pageNum);
+            } else alert(res.msg || "修改失败");
+        } catch (err) {}
+    }
+
+    // 重置搜索
+    function resetSearch() {
+        document.getElementById("orderIdSearch").value = "";
+        document.getElementById("userIdSearch").value = "";
+        document.getElementById("statusSearch").value = "";
+        loadOrderList(1);
+    }
+
+    // 时间格式化
+    function formatTime(time) {
+        if (!time) return "-";
+        return new Date(time).toLocaleString("zh-CN");
+    }
+
+    // 状态文本
+    function getStatusText(status) {
+        return {0:"未支付",1:"已支付",2:"已取消",3:"已完成"}[status] || "未知";
+    }
+
+    // 退出登录
+    function logout() {
+        if(confirm("确定退出？")){
+            SeckillUtil.logout();
+            window.location.href = 'admin-login.html';
+        }
+    }
+</script>
+</body>
+</html>
